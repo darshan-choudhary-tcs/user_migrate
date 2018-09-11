@@ -1,0 +1,94 @@
+<?php
+
+/**
+ * Implements hook_menu().
+ */
+function user_migrate_menu() {
+  $items['admin/config/people/migrate'] = array(
+    'title' => 'Pfizer migrate users',
+    'description' => 'The configuration section for PIS.com',
+    'position' => 'left',
+    'weight' => -10,
+    'page callback' => 'system_admin_menu_block_page',
+    'access arguments' => array('administer migrate users'),
+    'file' => 'system.admin.inc',
+    'file path' => drupal_get_path('module', 'system'),
+  );
+
+  $items['admin/config/people/migrate/users/export'] = array(
+    'title' => 'Export Users',
+    'description' => 'This page will give option to export the users in JSON file.',
+    'weight' => -10,
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('user_migrate_export_form'),
+    'access arguments' => array('administer migrate users'),
+    'file' => 'includes/user_migrate.export.inc',
+  );
+
+  $items['admin/config/people/migrate/users/import'] = array(
+    'title' => 'Import Users',
+    'description' => 'This page allows to import user\'s data from a JSON file.',
+    'weight' => -9,
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('user_migrate_import_form'),
+    'access arguments' => array('administer migrate users'),
+    'file' => 'includes/user_migrate.import.inc',
+  );
+  return $items;
+}
+
+
+/**
+ * Implements hook_permission().
+ */
+function user_migrate_permission() {
+  return array(
+    'administer migrate users' => array(
+      'title' => t('Administer migrate users'),
+      'description' => t('To allow access to export/import users.'),
+    ),
+  );
+}
+
+/**
+ * Custom helper function.
+ */
+function check_entity_exists($entity_type, $content_type = NULL, $field_name, $key_value) {
+  // Entity Query Approach
+  $query = new EntityFieldQuery();
+  $query->entityCondition('entity_type', $entity_type)
+    ->entityCondition('bundle', $content_type);
+  if($field_name == "title") {
+    $query->propertyCondition('title', $key_value);
+  }
+  else {
+    $query->fieldCondition($field_name, 'value', $key_value);
+  }
+
+  $result = $query->execute();
+  if (!isset($result[$entity_type]) || $result[$entity_type] == NULL) {
+    return array('operation' => 'add', 'message' => 'No primary key entries found');
+  }
+  elseif (count(array_keys($result[$entity_type])) > 1) {
+    return array('operation' => 'error', 'message' => 'Multiple primary key entries found');
+  }
+  else {
+    $entity_id = array_keys($result[$entity_type]);
+    $obj = entity_load($entity_type, $entity_id);
+    return array('operation' => 'edit', 'data' => reset($obj));
+  }
+}
+
+/**
+ * Write log function.
+ */
+function write_log($log, $import_type) {
+  $file_folder_base = 'private://migrate_users/' . $import_type;
+  file_prepare_directory($file_folder_base, FILE_CREATE_DIRECTORY);
+  if(!isset($_SESSION['logname'][$import_type])) {
+    $_SESSION['logname'][$import_type] = $import_type . '_' . date('d_m_Y_H_i_s') . '.log';
+  }
+  $filepath = $file_folder_base . '/' . $_SESSION['logname'][$import_type];
+  $content = "\r\n[" . date('d-m-Y H:i:s') . "] " . $log;
+  file_put_contents($filepath, $content, FILE_APPEND);
+}

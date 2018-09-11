@@ -1,0 +1,4 @@
+name = Pfizer Migrate Users
+description = Migrate users from drupal instances.
+core = 7.x
+package = Pfizer
